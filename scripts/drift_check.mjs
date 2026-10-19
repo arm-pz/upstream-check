@@ -80,6 +80,10 @@ function report(label, source, truth) {
     return;
   }
   const names = source.names || [];
+  if (truth === null) {
+    console.log(`${label.padEnd(28)} ${String(names.length).padStart(3)}   ${names.join(", ")}`);
+    return;
+  }
   const missing = sortSet(new Set(truth.filter((t) => !names.includes(t))));
   const extra = sortSet(new Set(names.filter((n) => !truth.includes(n))));
   console.log(
@@ -91,44 +95,50 @@ function report(label, source, truth) {
 }
 
 const owned = await listOwnedRepos();
-if (!owned.ok) { console.error(`cannot list ${OWNER} repos: ${owned.why}`); process.exit(2); }
+if (!owned.ok) console.error(`ground truth unavailable (${OWNER} repos: ${owned.why}) - listing counts are still reported, drift is not`);
 
 const truth = [];
 const noSkill = [];
-for (const repo of owned.repos) {
+for (const repo of (owned.ok ? owned.repos : [])) {
   const branch = repo.default_branch || (await defaultBranch(repo.name)) || "main";
   const probe = await hasSkillMd(repo.name, branch);
   if (probe.found) truth.push(norm(repo.name)); else noSkill.push(norm(repo.name));
 }
+const base = owned.ok ? truth : null;
 
-console.log(`owner ${OWNER} | ${owned.repos.length} owned repos | ${truth.length} ship a SKILL.md\n`);
-console.log(`ground truth (${truth.length}): ${truth.join(", ")}\n`);
+if (owned.ok) {
+  console.log(`owner ${OWNER} | ${owned.repos.length} owned repos | ${truth.length} ship a SKILL.md\n`);
+  console.log(`ground truth (${truth.length}): ${truth.join(", ")}\n`);
+}
 
 const mk = await get(`https://raw.githubusercontent.com/${OWNER}/${MARKETPLACE}/main/.claude-plugin/marketplace.json`);
 const mkNames = mk.ok ? (() => { try { return { ok: true, names: JSON.parse(mk.body).plugins.map((p) => norm(p.name)) }; } catch (e) { return { ok: false, why: `marketplace.json unparseable: ${e.message}` }; } })()
                      : { ok: false, why: mk.why };
-report("marketplace.json", mkNames, truth);
+report("marketplace.json", mkNames, base);
 
 const idx = await get(`${SITE}/agent-skills/index.json`);
-report("site index.json", idx.ok ? namesFromSiteIndex(idx.body) : { ok: false, why: idx.why }, truth);
+report("site index.json", idx.ok ? namesFromSiteIndex(idx.body) : { ok: false, why: idx.why }, base);
 
 const home = await get(`${SITE}/`);
 const homeNames = home.ok ? namesFromHomepage(home.body) : { ok: false, why: home.why };
-report("site homepage", homeNames, truth);
+report("site homepage", homeNames, base);
 
 if (idx.ok && home.ok) {
   const a = new Set(namesFromSiteIndex(idx.body).names), b = new Set(homeNames.names);
   const onlyIndex = sortSet([...a].filter((x) => !b.has(x)));
   const onlyHome = sortSet([...b].filter((x) => !a.has(x)));
-  const filterTruth = (l) => l.filter((x) => truth.includes(x));
+  const filterTruth = (l) => (base || truth).filter(x => l.includes(x));
   console.log(`\nsite internal sync: index.json ${a.size} vs homepage ${b.size}` +
     (onlyIndex.length || onlyHome.length ? ` | index-only: ${filterTruth(onlyIndex).join(", ") || "-"} | homepage-only: ${filterTruth(onlyHome).join(", ") || "-"}` : " | agree"));
 }
 
 for (const [label, repo] of [["profile README", OWNER], [`${MARKETPLACE} README`, MARKETPLACE], ["skills-site README", "skills-site"]]) {
   const r = await get(`https://raw.githubusercontent.com/${OWNER}/${repo}/main/README.md`);
-  report(label, r.ok ? namesFromReadme(r.body, truth) : { ok: false, why: r.why }, truth);
+  const src = !r.ok ? { ok: false, why: r.why }
+    : base === null ? { ok: false, why: "matched against ground truth, which is unavailable" }
+    : namesFromReadme(r.body, truth);
+  report(label, src, base);
 }
 
-console.log(`\nnot counted as skills (no SKILL.md at root or skills/<name>/): ${noSkill.join(", ")}`);
+if (owned.ok) console.log(`\nnot counted as skills (no SKILL.md at root or skills/<name>/): ${noSkill.join(", ")}`);
 console.log("counts above are what each source publishes; ground truth is what actually ships.");
