@@ -1,0 +1,9 @@
+{
+  "name": "upstream-check",
+  "version": "0.1.0",
+  "description": "Audits local git clones against their upstream before pushing: fetches first, classifies each repo as level, push-ready, behind or diverged, screens the staged diff for secrets, and only pushes with --push.",
+  "author": {
+    "name": "Abdul Rahman P Z"
+  },
+  "repository": "https://github.com/arm-pz/upstream-check"
+}
