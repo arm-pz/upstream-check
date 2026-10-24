@@ -63,7 +63,11 @@ function namesFromHomepage(body) {
   const hrefs = [...body.matchAll(/href="\/?([a-z0-9][a-z0-9-]*)\/?"/gi)].map((m) => norm(m[1]));
   const anchors = [...body.matchAll(/href="#([a-z0-9][a-z0-9-]*)"/gi)].map((m) => norm(m[1]));
   const skip = new Set(["", "agent-skills", "index", "fonts", "css", "js", "assets"]);
-  return { ok: true, names: sortSet(new Set([...hrefs, ...anchors].filter((n) => n && !skip.has(n)))) };
+  // A hub that links to per-skill pages uses #anchors for its own sections (#career, #ship-checks),
+  // so anchors only name skills on a single-page hub with no page links.
+  const pages = hrefs.filter((n) => n && !skip.has(n));
+  const names = pages.length ? pages : anchors.filter((n) => n && !skip.has(n));
+  return { ok: true, names: sortSet(new Set(names)) };
 }
 
 // READMEs list skills by name; match against ground truth rather than guessing at structure.
@@ -127,7 +131,8 @@ if (idx.ok && home.ok) {
   const a = new Set(namesFromSiteIndex(idx.body).names), b = new Set(homeNames.names);
   const onlyIndex = sortSet([...a].filter((x) => !b.has(x)));
   const onlyHome = sortSet([...b].filter((x) => !a.has(x)));
-  const filterTruth = (l) => (base || truth).filter(x => l.includes(x));
+  // Without ground truth there is nothing to filter against; show the raw difference.
+  const filterTruth = (l) => base ? base.filter((x) => l.includes(x)) : l;
   console.log(`\nsite internal sync: index.json ${a.size} vs homepage ${b.size}` +
     (onlyIndex.length || onlyHome.length ? ` | index-only: ${filterTruth(onlyIndex).join(", ") || "-"} | homepage-only: ${filterTruth(onlyHome).join(", ") || "-"}` : " | agree"));
 }
