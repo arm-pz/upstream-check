@@ -1,7 +1,8 @@
 # upstream-check
 
 An agent skill that finds local work which never reached its remote, pushes only what is safe to
-push, and then checks whether the listings people actually read still agree with the repos.
+push. Checking whether the site and READMEs agree with the repos moved to
+[`listing-drift`](https://github.com/arm-pz/listing-drift).
 
 Plain `git status` compares your branch against a remote-tracking ref that is only as fresh as the
 last fetch. That is how a repo sits there with unpushed commits and reports "up to date". This skill
@@ -39,22 +40,6 @@ local and are named as such. The skill never commits someone's loose work to mak
 `--only` exists because a machine can have more than one person on it. A repo can be push-ready by
 arithmetic while another session is mid-way through it; scope the batch by name.
 
-## Listing drift
-
-```bash
-node scripts/drift_check.mjs --owner arm-pz --site https://skills.caffeinity.com
-```
-
-Ground truth is every owned repo that ships a `SKILL.md` at the root or at `skills/<repo>/SKILL.md`.
-Repo descriptions are not evidence — they drift, and a description can claim a skill the repo does
-not contain. Each published source is then measured against that truth: the machine-readable site
-index, the site homepage, the plugin marketplace manifest and the named READMEs, each reported as
-*absent* (a real repo the source omits) or *not in ground truth* (a name no repo ships — sometimes
-legitimate, when a plugin id differs from its repo).
-
-A source that could not be read is reported **INCONCLUSIVE**, never counted as empty. `--offline`
-makes that explicit for every network source.
-
 ## Tests
 
 ```bash
@@ -68,10 +53,9 @@ the guards bite rather than pass vacuously: a planted AWS access key blocks its 
 
 ## Limits
 
-Repos are discovered one level below `--root`. The driller uses the unauthenticated GitHub API, so a
-full sweep is rate-budgeted; it makes one listing call and reads the rest from raw hosts. It reports
-what a listing claims, not whether the listing is good — prose and discoverability belong to
-[`findable`](https://github.com/arm-pz/findable), and whether a build is safe to deploy belongs to
-the pre-ship skills.
+Repos are discovered one level below `--root`. Listing drift belongs to
+[`listing-drift`](https://github.com/arm-pz/listing-drift), discoverability to
+[`findable`](https://github.com/arm-pz/findable), and whether a build is safe to deploy to the
+pre-ship skills.
 
 MIT — see [LICENSE](LICENSE).
