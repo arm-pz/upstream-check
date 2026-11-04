@@ -1,6 +1,6 @@
 ---
 name: upstream-check
-description: Find local work that never reached its remote and push only what is safe, then check whether published listings agree with the repos. Fetches a folder of git clones, classifies every repo as push-ready, level, behind, diverged, no-upstream or no-remote, screens the outgoing diff for credential-shaped lines, and with --push fast-forwards only the clean ones and never forces, uses --no-verify, or touches a diverged repo. A second checker counts a catalogue wherever it is published (site index, homepage, marketplace, READMEs) against the repos that ship a SKILL.md, and names what drifted. Use when the user asks what has not been pushed, whether clones are behind upstream, to push a batch, or why a site and a README list different numbers than GitHub. Not for writing or tuning a skill (use draft-skill or tune-skill), making a repo discoverable (use findable), or deciding whether a build is safe to deploy (use release-gate-chair).
+description: Find local work that never reached its remote and push only what is safe, then check whether published listings agree with the repos. Fetches a folder of git clones, classifies every repo as push-ready, level, behind, diverged, no-upstream or no-remote, screens the outgoing diff for credential-shaped lines, and with --push fast-forwards only the clean ones and never forces, uses --no-verify, or touches a diverged repo. A second checker counts a catalogue wherever it is published (index, homepage, llms.txt, marketplace, READMEs) against the repos that ship a SKILL.md, checks typed numbers ("44 skills") against the site headline, flags a retired host, and names what drifted. Use when the user asks what has not been pushed, whether clones are behind upstream, to push a batch, or why a site and a README show different numbers. Not for writing or tuning a skill (use draft-skill or tune-skill), making a repo discoverable (use findable), or deciding whether a build is safe to deploy (use release-gate-chair).
 ---
 
 # Upstream check
@@ -42,16 +42,19 @@ Before a push the script screens added lines in the outgoing diff for GitHub, AW
 ## Listing drift
 
 ```
-node scripts/drift_check.mjs --owner arm-pz --site https://skills.caffeinity.com
+node scripts/drift_check.mjs --owner arm-pz --site https://skillsmith.tech --retired skills.caffeinity.com
 ```
 
-Ground truth is every owned repo that ships `SKILL.md` at the root or at `skills/<repo>/SKILL.md`. Each published source is then measured against it: the machine-readable index, the homepage, the marketplace manifest, and the named READMEs. `--offline` reports every network source as inconclusive instead of zero.
+Point `--site` at the canonical host, never a retired one that redirects: a check aimed at the old address reads whatever the redirect serves and calls it agreement. Ground truth is every owned repo that ships `SKILL.md` at the root or at `skills/<repo>/SKILL.md`. Each published source is then measured against it: the machine-readable index, the homepage, the marketplace manifest, and the named READMEs. `--offline` reports every network source as inconclusive instead of zero.
 
 Read the columns this way:
 
 - **absent** — a real repo this source does not mention. A README that lists fewer than the repos is usually stale, not deliberate.
 - **not in ground truth** — the source names something no repo ships. Sometimes legitimate: a plugin id and its repo can differ (`release-gate` published from `release-gate-chair`). Confirm the manifest's `source.repo` resolves before calling it an error.
 - **two site indexes disagreeing** — the pages a visitor sees and the file an installer reads are built separately. Treat that as a live bug, not a cosmetic mismatch, and check whether one of them 404s.
+
+- **stated counts** — a number typed into prose ("44 skills" in a README, "59 skills" in llms.txt) drifts without any name changing, so name matching never sees it. Each is judged against the hub's own `N skills and M mods` headline; a number equal to skills + mods is the commonest slip and is named as such. Counts in dated run logs (`× 42 skills`, `on the 42 skills`) are shown as context, not findings.
+- **retired host** — a source still linking the old domain after a move. Fix the source; the redirect only hides it.
 
 A repo that ships a skill but appears in no listing is a distribution gap, not a drift finding — that one belongs with `findable`.
 
@@ -62,7 +65,7 @@ Verdict table first, then what was pushed and what was refused and why. Name wha
 ## Tests
 
 ```
-node --test tests/upstream_check.test.mjs
+node --test tests/upstream_check.test.mjs tests/claims.test.mjs
 ```
 
-Each case builds a throwaway repo in one git state against a throwaway remote and asserts the verdict, so the suite judges classification rather than file contents. It also asserts two guards actually bite: a planted credential key blocks the push, and `--allow-secret-hits` is what lets it through.
+Each case builds a throwaway repo in one git state against a throwaway remote and asserts the verdict, so the suite judges classification rather than file contents. It also asserts two guards actually bite: a planted credential key blocks the push, and `--allow-secret-hits` is what lets it through. `claims.test.mjs` pins the stated-count reader: a mods-as-skills total, a stale README number, and dated run counts that must not be findings.

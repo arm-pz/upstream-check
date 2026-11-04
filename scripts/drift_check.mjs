@@ -1,20 +1,25 @@
 #!/usr/bin/env node
 // Count the same catalogue wherever it is published, and say which source disagrees.
 //
-//   node scripts/drift_check.mjs [--owner arm-pz] [--site https://skills.caffeinity.com]
-//                                [--marketplace caffeinity-skills] [--offline]
+//   node scripts/drift_check.mjs [--owner arm-pz] [--site https://skillsmith.tech]
+//                                [--marketplace caffeinity-skills] [--retired skills.caffeinity.com]
+//                                [--offline]
 //
 // Ground truth is a repo that ships a SKILL.md, not a repo whose description mentions one.
 // Everything else is a claim about that catalogue: the marketplace manifest, the site index,
 // the site homepage, and the README lists. A source that could not be read is reported as
-// inconclusive rather than as empty.
+// inconclusive rather than as empty. Stated numbers ("44 skills") and links to a retired host are
+// checked too: they are typed once, never regenerated, and drift without any name changing.
+
+import { statedCounts, judgeCounts, retiredMentions } from "./claims.mjs";
 
 const args = process.argv.slice(2);
 const arg = (flag, dflt) => { const i = args.indexOf(flag); return i !== -1 && args[i + 1] ? args[i + 1] : dflt; };
 const OWNER = arg("--owner", "arm-pz");
-const SITE = arg("--site", "https://skills.caffeinity.com").replace(/\/+$/, "");
+const SITE = arg("--site", "https://skillsmith.tech").replace(/\/+$/, "");
 const MARKETPLACE = arg("--marketplace", "caffeinity-skills");
 const OFFLINE = args.includes("--offline");
+const RETIRED = arg("--retired", "skills.caffeinity.com").split(",").filter(Boolean);
 
 const get = async (url, opts = {}) => {
   if (OFFLINE) return { ok: false, status: 0, url, body: "", why: "offline mode" };
@@ -137,12 +142,37 @@ if (idx.ok && home.ok) {
     (onlyIndex.length || onlyHome.length ? ` | index-only: ${filterTruth(onlyIndex).join(", ") || "-"} | homepage-only: ${filterTruth(onlyHome).join(", ") || "-"}` : " | agree"));
 }
 
+const readmes = [];
 for (const [label, repo] of [["profile README", OWNER], [`${MARKETPLACE} README`, MARKETPLACE], ["skills-site README", "skills-site"]]) {
   const r = await get(`https://raw.githubusercontent.com/${OWNER}/${repo}/main/README.md`);
+  readmes.push([label, r.ok ? r.body : null, r.why]);
   const src = !r.ok ? { ok: false, why: r.why }
     : base === null ? { ok: false, why: "matched against ground truth, which is unavailable" }
     : namesFromReadme(r.body, truth);
   report(label, src, base);
+}
+
+// Stated numbers. The reference is the hub's own headline, which the site generates; ground truth
+// (repos with a SKILL.md) can legitimately differ from it, so it is shown for context, not judged.
+const llms = await get(`${SITE}/llms.txt`);
+const homeClaims = home.ok ? statedCounts(home.body).filter((c) => !c.dated) : [];
+const ref = homeClaims.find((c) => c.mods !== undefined) || homeClaims[0];
+console.log("\nstated counts" + (ref ? ` (reference: homepage says ${ref.at})` : "") +
+  (owned.ok ? ` | ${truth.length} repos ship a SKILL.md` : ""));
+if (!ref) console.log(`${"".padEnd(28)} INCONCLUSIVE  no "N skills" headline on ${SITE}/ to judge against`);
+const textSources = [["site homepage", home.ok ? home.body : null, home.why], ["site llms.txt", llms.ok ? llms.body : null, llms.why],
+  ...readmes];
+for (const [label, body, why] of textSources) {
+  if (body === null) { console.log(`${label.padEnd(28)} INCONCLUSIVE  ${why} (not counted as agreeing)`); continue; }
+  const claims = statedCounts(body);
+  const bad = ref ? judgeCounts(claims, ref) : [];
+  const dated = claims.filter((c) => c.dated).map((c) => c.at);
+  const old = retiredMentions(body, RETIRED);
+  const parts = [];
+  if (ref) parts.push(bad.length ? bad.map((b) => `"${b.at}" - ${b.why}`).join("; ") : (claims.some((c) => !c.dated) ? "agrees" : "states no count"));
+  if (dated.length) parts.push(`dated run counts (context): ${[...new Set(dated)].join(", ")}`);
+  if (old.length) parts.push(`still names retired host ${old.join(", ")}`);
+  console.log(`${label.padEnd(28)} ${parts.join(" | ")}`);
 }
 
 if (owned.ok) console.log(`\nnot counted as skills (no SKILL.md at root or skills/<name>/): ${noSkill.join(", ")}`);
