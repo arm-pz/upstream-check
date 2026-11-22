@@ -43,7 +43,7 @@ Before a push the script screens added lines in the outgoing diff for GitHub, AW
 ## Listing drift
 
 ```
-node scripts/drift_check.mjs --owner arm-pz --site https://skills.caffeinity.com
+node scripts/drift_check.mjs --owner arm-pz --site https://skillsmith.tech
 ```
 
 Ground truth is every owned repo that ships `SKILL.md` at the root or at `skills/<repo>/SKILL.md`. Each published source is then measured against it: the machine-readable index, the homepage, the marketplace manifest, and the named READMEs. `--offline` reports every network source as inconclusive instead of zero.

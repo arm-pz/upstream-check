@@ -42,7 +42,7 @@ arithmetic while another session is mid-way through it; scope the batch by name.
 ## Listing drift
 
 ```bash
-node scripts/drift_check.mjs --owner arm-pz --site https://skills.caffeinity.com
+node scripts/drift_check.mjs --owner arm-pz --site https://skillsmith.tech
 ```
 
 Ground truth is every owned repo that ships a `SKILL.md` at the root or at `skills/<repo>/SKILL.md`.
