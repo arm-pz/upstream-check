@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Count the same catalogue wherever it is published, and say which source disagrees.
 //
-//   node scripts/drift_check.mjs [--owner arm-pz] [--site https://skills.caffeinity.com]
+//   node scripts/drift_check.mjs [--owner arm-pz] [--site https://skillsmith.tech]
 //                                [--marketplace caffeinity-skills] [--offline]
 //
 // Ground truth is a repo that ships a SKILL.md, not a repo whose description mentions one.
@@ -12,7 +12,7 @@
 const args = process.argv.slice(2);
 const arg = (flag, dflt) => { const i = args.indexOf(flag); return i !== -1 && args[i + 1] ? args[i + 1] : dflt; };
 const OWNER = arg("--owner", "arm-pz");
-const SITE = arg("--site", "https://skills.caffeinity.com").replace(/\/+$/, "");
+const SITE = arg("--site", "https://skillsmith.tech").replace(/\/+$/, "");
 const MARKETPLACE = arg("--marketplace", "caffeinity-skills");
 const OFFLINE = args.includes("--offline");
 
